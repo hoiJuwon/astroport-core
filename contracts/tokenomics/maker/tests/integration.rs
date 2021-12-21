@@ -90,6 +90,7 @@ fn instantiate_contracts(
         fee_address: None,
         owner: owner.to_string(),
         generator_address: Some(String::from("generator")),
+        asset_holder_rewards_code_id: 234u64,
     };
 
     let factory_instance = router

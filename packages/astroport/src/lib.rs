@@ -1,4 +1,5 @@
 pub mod asset;
+pub mod asset_holder_rewards;
 pub mod common;
 pub mod factory;
 pub mod generator;

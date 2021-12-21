@@ -76,6 +76,8 @@ pub struct InstantiateMsg {
     pub generator_address: Option<String>,
     /// contract address that used for controls settings for factory, pools and tokenomics contracts
     pub owner: String,
+    /// Asset holder rewards code ID which will be used for distributing asset holder rewards
+    pub asset_holder_rewards_code_id: u64,
 }
 
 /// ## Description
@@ -91,6 +93,8 @@ pub enum ExecuteMsg {
         fee_address: Option<String>,
         /// contract address that used for auto_stake from pools
         generator_address: Option<String>,
+        /// Asset holder rewards code ID which will be used for distributing asset holder rewards
+        asset_holder_rewards_code_id: Option<u64>,
     },
     /// UpdatePairConfig updates configs of pair
     UpdatePairConfig {
@@ -164,13 +168,17 @@ pub struct ConfigResponse {
     pub fee_address: Option<Addr>,
     /// Contract address that used for auto_stake from pools
     pub generator_address: Option<Addr>,
+    /// Asset holder rewards code ID which will be used for distributing asset holder rewards
+    pub asset_holder_rewards_code_id: u64,
 }
 
 /// ## Description
 /// This structure describes a migration message.
-/// We currently take no arguments for migrations.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct MigrateMsg {}
+pub struct MigrateMsg {
+    /// Asset holder rewards code ID which will be used for distributing asset holder rewards
+    pub asset_holder_rewards_code_id: u64,
+}
 
 /// ## Description
 /// A custom struct for each query response that returns an array of objects type [`PairInfo`].

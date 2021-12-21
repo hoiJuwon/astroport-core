@@ -2,13 +2,17 @@ use crate::error::ContractError;
 use crate::math::{
     calc_amount, compute_d, AMP_PRECISION, MAX_AMP, MAX_AMP_CHANGE, MIN_AMP_CHANGING_TIME, N_COINS,
 };
-use crate::state::{Config, CONFIG};
+use crate::state::{Config, ASSET_HOLDER_REWARDS, CONFIG};
 
+use astroport::asset_holder_rewards::{
+    AssetsBalancesAndClaimRewardsMessages, ExecuteMsg as AssetHolderRewardsExecuteMsg,
+    InstantiateMsg as AssetHolderRewardsInstantiateMsg, QueryMsg as AssetHolderRewardsQueryMsg,
+};
 use cosmwasm_bignumber::Decimal256;
 use cosmwasm_std::{
     attr, entry_point, from_binary, to_binary, Addr, Binary, Coin, CosmosMsg, Decimal, Deps,
-    DepsMut, Env, MessageInfo, Reply, ReplyOn, Response, StdError, StdResult, SubMsg, Uint128,
-    WasmMsg,
+    DepsMut, Empty, Env, MessageInfo, Reply, ReplyOn, Response, StdError, StdResult, SubMsg,
+    Uint128, WasmMsg,
 };
 
 use crate::response::MsgInstantiateContractResponse;
@@ -42,6 +46,7 @@ const CONTRACT_NAME: &str = "astroport-pair-stable";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 /// A `reply` call code ID of sub-message.
 const INSTANTIATE_TOKEN_REPLY_ID: u64 = 1;
+const INSTANTATE_ASSET_HOLDER_REWARDS_REPLY_ID: u64 = 2;
 
 /// ## Description
 /// Creates a new contract with the specified parameters in the [`InstantiateMsg`].
@@ -79,6 +84,28 @@ pub fn instantiate(
         return Err(ContractError::IncorrectAmp {});
     }
 
+    let mut messages: Vec<SubMsg> = vec![];
+
+    if let Some(info) = params.asset_holder_rewards {
+        messages.push(SubMsg {
+            msg: CosmosMsg::Wasm(WasmMsg::Instantiate {
+                admin: None,
+                code_id: query_factory_config(&deps.querier, msg.factory_addr.clone())?
+                    .asset_holder_rewards_code_id,
+                funds: vec![],
+                label: "Astroport asset holder".to_string(),
+                msg: to_binary(&AssetHolderRewardsInstantiateMsg {
+                    admins: vec![env.contract.address.to_string()],
+                    info,
+                    mutable: false,
+                })?,
+            }),
+            id: INSTANTATE_ASSET_HOLDER_REWARDS_REPLY_ID,
+            gas_limit: None,
+            reply_on: ReplyOn::Success,
+        })
+    }
+
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
     let config = Config {
@@ -103,7 +130,7 @@ pub fn instantiate(
     let token_name = format_lp_token_name(msg.asset_infos, &deps.querier)?;
 
     // Create LP token
-    let sub_msg: Vec<SubMsg> = vec![SubMsg {
+    messages.push(SubMsg {
         msg: WasmMsg::Instantiate {
             code_id: msg.token_code_id,
             msg: to_binary(&TokenInstantiateMsg {
@@ -124,9 +151,9 @@ pub fn instantiate(
         id: INSTANTIATE_TOKEN_REPLY_ID,
         gas_limit: None,
         reply_on: ReplyOn::Success,
-    }];
+    });
 
-    Ok(Response::new().add_submessages(sub_msg))
+    Ok(Response::new().add_submessages(messages))
 }
 
 /// # Description
@@ -139,24 +166,40 @@ pub fn instantiate(
 /// * **msg** is the object of type [`Reply`].
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn reply(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, ContractError> {
-    let mut config: Config = CONFIG.load(deps.storage)?;
-
-    if config.pair_info.liquidity_token != Addr::unchecked("") {
-        return Err(ContractError::Unauthorized {});
-    }
-
     let data = msg.result.unwrap().data.unwrap();
     let res: MsgInstantiateContractResponse =
         Message::parse_from_bytes(data.as_slice()).map_err(|_| {
             StdError::parse_err("MsgInstantiateContractResponse", "failed to parse data")
         })?;
 
-    config.pair_info.liquidity_token =
-        addr_validate_to_lower(deps.api, res.get_contract_address())?;
+    let mut response = Response::new();
 
-    CONFIG.save(deps.storage, &config)?;
+    match msg.id {
+        INSTANTIATE_TOKEN_REPLY_ID => {
+            let mut config: Config = CONFIG.load(deps.storage)?;
 
-    Ok(Response::new().add_attribute("liquidity_token_addr", config.pair_info.liquidity_token))
+            if config.pair_info.liquidity_token != Addr::unchecked("") {
+                return Err(ContractError::Unauthorized {});
+            }
+            config.pair_info.liquidity_token =
+                addr_validate_to_lower(deps.api, res.get_contract_address())?;
+
+            CONFIG.save(deps.storage, &config)?;
+
+            response.attributes.push(attr(
+                "liquidity_token_addr",
+                config.pair_info.liquidity_token,
+            ));
+        }
+        INSTANTATE_ASSET_HOLDER_REWARDS_REPLY_ID => {
+            let addr = addr_validate_to_lower(deps.api, res.get_contract_address())?;
+            ASSET_HOLDER_REWARDS.save(deps.storage, &addr)?;
+            response.attributes.push(attr("asset_holder_rewards", addr))
+        }
+        _ => return Err(ContractError::Unauthorized {}),
+    };
+
+    Ok(response)
 }
 
 /// ## Description
@@ -467,6 +510,32 @@ pub fn provide_liquidity(
         auto_stake,
     )?);
 
+    if !total_share.is_zero() {
+        if let Some(asset_holder_rewards) = ASSET_HOLDER_REWARDS.may_load(deps.storage)? {
+            let balances_and_messages: AssetsBalancesAndClaimRewardsMessages =
+                deps.querier.query_wasm_smart(
+                    asset_holder_rewards.to_string(),
+                    &AssetHolderRewardsQueryMsg::AssetsBalancesAndClaimRewardsMessages::<Empty> {},
+                )?;
+            messages.extend_from_slice(&balances_and_messages.messages);
+            messages.push(CosmosMsg::Wasm(WasmMsg::Execute {
+                contract_addr: asset_holder_rewards.to_string(),
+                funds: vec![],
+                msg: to_binary(&AssetHolderRewardsExecuteMsg::<Empty>::HandleRewards {
+                    previous_assets_balances: balances_and_messages.balances,
+                    old_user_share: astroport::querier::query_token_balance(
+                        &deps.querier,
+                        config.pair_info.liquidity_token.clone(),
+                        info.sender.clone(),
+                    )?,
+                    old_total_share: total_share,
+                    user: info.sender.clone(),
+                    receiver: Some(info.sender.to_string()),
+                })?,
+            }));
+        }
+    }
+
     // Accumulate prices for oracle
     if let Some((price0_cumulative_new, price1_cumulative_new, block_time)) = accumulate_prices(
         env,
@@ -587,7 +656,7 @@ pub fn withdraw_liquidity(
 
     // Accumulate prices for oracle
     if let Some((price0_cumulative_new, price1_cumulative_new, block_time)) = accumulate_prices(
-        env,
+        env.clone(),
         &config,
         pools[0].amount,
         query_token_precision(&deps.querier, pools[0].info.clone())?,
@@ -600,7 +669,7 @@ pub fn withdraw_liquidity(
         CONFIG.save(deps.storage, &config)?;
     }
 
-    let messages: Vec<CosmosMsg> = vec![
+    let mut messages: Vec<CosmosMsg> = vec![
         refund_assets[0]
             .clone()
             .into_msg(&deps.querier, sender.clone())?,
@@ -613,6 +682,32 @@ pub fn withdraw_liquidity(
             funds: vec![],
         }),
     ];
+
+    if !total_share.is_zero() {
+        if let Some(asset_holder_rewards) = ASSET_HOLDER_REWARDS.may_load(deps.storage)? {
+            let balances_and_messages: AssetsBalancesAndClaimRewardsMessages =
+                deps.querier.query_wasm_smart(
+                    asset_holder_rewards.to_string(),
+                    &AssetHolderRewardsQueryMsg::AssetsBalancesAndClaimRewardsMessages::<Empty> {},
+                )?;
+            messages.extend_from_slice(&balances_and_messages.messages);
+            messages.push(CosmosMsg::Wasm(WasmMsg::Execute {
+                contract_addr: asset_holder_rewards.to_string(),
+                funds: vec![],
+                msg: to_binary(&AssetHolderRewardsExecuteMsg::<Empty>::HandleRewards {
+                    previous_assets_balances: balances_and_messages.balances,
+                    old_user_share: astroport::querier::query_token_balance(
+                        &deps.querier,
+                        config.pair_info.liquidity_token.clone(),
+                        sender.clone(),
+                    )? + amount,
+                    old_total_share: total_share,
+                    user: sender.clone(),
+                    receiver: Some(sender.to_string()),
+                })?,
+            }));
+        }
+    }
 
     let attributes = vec![
         attr("action", "withdraw_liquidity"),

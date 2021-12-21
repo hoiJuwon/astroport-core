@@ -25,3 +25,5 @@ pub struct Config {
 }
 
 pub const CONFIG: Item<Config> = Item::new("config");
+
+pub const ASSET_HOLDER_REWARDS: Item<Addr> = Item::new("asset_holder_rewards_address");

@@ -1,3 +1,4 @@
+use cw_storage_plus::PrimaryKey;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -152,7 +153,7 @@ impl Asset {
 /// Token { contract_addr: Addr::unchecked("terra...") };
 /// NativeToken { denom: String::from("uluna") };
 /// ```
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
 pub enum AssetInfo {
     /// Token
@@ -259,6 +260,17 @@ impl AssetInfo {
             }
         }
         Ok(())
+    }
+}
+
+impl<'a> PrimaryKey<'a> for &AssetInfo {
+    type Prefix = ();
+    type SubPrefix = ();
+    fn key(&self) -> Vec<&[u8]> {
+        vec![match self {
+            AssetInfo::NativeToken { denom } => denom.as_bytes(),
+            AssetInfo::Token { contract_addr } => contract_addr.as_bytes(),
+        }]
     }
 }
 

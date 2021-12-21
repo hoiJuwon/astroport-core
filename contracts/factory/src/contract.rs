@@ -4,6 +4,7 @@ use cosmwasm_std::{
 };
 
 use crate::error::ContractError;
+use crate::migration;
 use crate::querier::query_pair_info;
 
 use crate::state::{
@@ -57,6 +58,7 @@ pub fn instantiate(
         token_code_id: msg.token_code_id,
         fee_address: None,
         generator_address: None,
+        asset_holder_rewards_code_id: msg.asset_holder_rewards_code_id,
     };
 
     if let Some(generator_address) = msg.generator_address {
@@ -101,6 +103,8 @@ pub struct UpdateConfig {
     fee_address: Option<String>,
     /// Sets contract address that used for auto_stake from pools
     generator_address: Option<String>,
+    /// Asset holder rewards code ID which will be used for distributing asset holder rewards
+    asset_holder_rewards_code_id: Option<u64>,
 }
 
 /// ## Description
@@ -148,6 +152,7 @@ pub fn execute(
             token_code_id,
             fee_address,
             generator_address,
+            asset_holder_rewards_code_id,
         } => execute_update_config(
             deps,
             env,
@@ -156,6 +161,7 @@ pub fn execute(
                 token_code_id,
                 fee_address,
                 generator_address,
+                asset_holder_rewards_code_id,
             },
         ),
         ExecuteMsg::UpdatePairConfig { config } => execute_update_pair_config(deps, info, config),
@@ -242,6 +248,10 @@ pub fn execute_update_config(
 
     if let Some(token_code_id) = param.token_code_id {
         config.token_code_id = token_code_id;
+    }
+
+    if let Some(code_id) = param.asset_holder_rewards_code_id {
+        config.asset_holder_rewards_code_id = code_id;
     }
 
     CONFIG.save(deps.storage, &config)?;
@@ -483,6 +493,7 @@ pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
             .collect(),
         fee_address: config.fee_address,
         generator_address: config.generator_address,
+        asset_holder_rewards_code_id: config.asset_holder_rewards_code_id,
     };
 
     Ok(resp)
@@ -546,6 +557,10 @@ pub fn query_fee_info(deps: Deps, pair_type: PairType) -> StdResult<FeeInfoRespo
 ///
 /// * **_msg** is the object of type [`MigrateMsg`].
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn migrate(_deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response> {
-    Ok(Response::default())
+pub fn migrate(mut deps: DepsMut, env: Env, msg: MigrateMsg) -> StdResult<Response> {
+    let response = migration::migrate(deps.branch(), env, msg);
+
+    set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+
+    response
 }

@@ -21,6 +21,8 @@ pub struct Config {
     pub generator_address: Option<Addr>,
     /// contract address to send fees to
     pub fee_address: Option<Addr>,
+    /// Asset holder rewards code ID which will be used for distributing asset holder rewards
+    pub asset_holder_rewards_code_id: u64,
 }
 
 /// ## Description

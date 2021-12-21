@@ -65,7 +65,13 @@ fn proper_initialization() {
             },
         ],
         token_code_id: 10u64,
-        init_params: Some(to_binary(&StablePoolParams { amp: 100 }).unwrap()),
+        init_params: Some(
+            to_binary(&StablePoolParams {
+                amp: 100,
+                asset_holder_rewards: None,
+            })
+            .unwrap(),
+        ),
     };
 
     let sender = "addr0000";
@@ -148,7 +154,13 @@ fn provide_liquidity() {
         ],
         token_code_id: 10u64,
         factory_addr: Addr::unchecked("factory"),
-        init_params: Some(to_binary(&StablePoolParams { amp: 100 }).unwrap()),
+        init_params: Some(
+            to_binary(&StablePoolParams {
+                amp: 100,
+                asset_holder_rewards: None,
+            })
+            .unwrap(),
+        ),
     };
 
     let env = mock_env();
@@ -512,7 +524,13 @@ fn withdraw_liquidity() {
         ],
         token_code_id: 10u64,
         factory_addr: Addr::unchecked("factory"),
-        init_params: Some(to_binary(&StablePoolParams { amp: 100 }).unwrap()),
+        init_params: Some(
+            to_binary(&StablePoolParams {
+                amp: 100,
+                asset_holder_rewards: None,
+            })
+            .unwrap(),
+        ),
     };
 
     let env = mock_env();
@@ -638,7 +656,13 @@ fn try_native_to_token() {
         ],
         token_code_id: 10u64,
         factory_addr: Addr::unchecked("factory"),
-        init_params: Some(to_binary(&StablePoolParams { amp: 100 }).unwrap()),
+        init_params: Some(
+            to_binary(&StablePoolParams {
+                amp: 100,
+                asset_holder_rewards: None,
+            })
+            .unwrap(),
+        ),
     };
 
     let env = mock_env_with_block_time(100);
@@ -828,7 +852,13 @@ fn try_token_to_native() {
         ],
         token_code_id: 10u64,
         factory_addr: Addr::unchecked("factory"),
-        init_params: Some(to_binary(&StablePoolParams { amp: 100 }).unwrap()),
+        init_params: Some(
+            to_binary(&StablePoolParams {
+                amp: 100,
+                asset_holder_rewards: None,
+            })
+            .unwrap(),
+        ),
     };
 
     let env = mock_env_with_block_time(100);
@@ -1108,7 +1138,13 @@ fn test_query_pool() {
         ],
         token_code_id: 10u64,
         factory_addr: Addr::unchecked("factory"),
-        init_params: Some(to_binary(&StablePoolParams { amp: 100 }).unwrap()),
+        init_params: Some(
+            to_binary(&StablePoolParams {
+                amp: 100,
+                asset_holder_rewards: None,
+            })
+            .unwrap(),
+        ),
     };
 
     let env = mock_env();
@@ -1173,7 +1209,13 @@ fn test_query_share() {
         ],
         token_code_id: 10u64,
         factory_addr: Addr::unchecked("factory"),
-        init_params: Some(to_binary(&StablePoolParams { amp: 100 }).unwrap()),
+        init_params: Some(
+            to_binary(&StablePoolParams {
+                amp: 100,
+                asset_holder_rewards: None,
+            })
+            .unwrap(),
+        ),
     };
 
     let env = mock_env();

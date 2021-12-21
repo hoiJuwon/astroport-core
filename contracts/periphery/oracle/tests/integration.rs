@@ -109,6 +109,7 @@ fn instantiate_contracts(router: &mut App, owner: Addr) -> (Addr, Addr, u64) {
         fee_address: None,
         generator_address: Some(String::from("generator")),
         owner: owner.to_string(),
+        asset_holder_rewards_code_id: 234u64,
     };
 
     let factory_instance = router
@@ -355,7 +356,13 @@ fn create_pair_stable(
             &astroport::factory::ExecuteMsg::CreatePair {
                 pair_type: PairType::Stable {},
                 asset_infos: asset_infos.clone(),
-                init_params: Some(to_binary(&StablePoolParams { amp: 100 }).unwrap()),
+                init_params: Some(
+                    to_binary(&StablePoolParams {
+                        amp: 100,
+                        asset_holder_rewards: None,
+                    })
+                    .unwrap(),
+                ),
             },
             &[],
         )

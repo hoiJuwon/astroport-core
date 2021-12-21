@@ -6,6 +6,7 @@ members = [
     "contracts/pair_stable",
     "contracts/router",
     "contracts/token",
+    "contracts/asset_holder_rewards",
     "contracts/tokenomics/*",
     "contracts/periphery/*"
 ]

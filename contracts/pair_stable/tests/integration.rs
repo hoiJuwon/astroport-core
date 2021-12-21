@@ -106,7 +106,13 @@ fn instantiate_pair(mut router: &mut App, owner: &Addr) -> Addr {
         ],
         token_code_id: token_contract_code_id,
         factory_addr: Addr::unchecked("factory"),
-        init_params: Some(to_binary(&StablePoolParams { amp: 100 }).unwrap()),
+        init_params: Some(
+            to_binary(&StablePoolParams {
+                amp: 100,
+                asset_holder_rewards: None,
+            })
+            .unwrap(),
+        ),
     };
 
     let pair = router
@@ -366,6 +372,7 @@ fn test_compatibility_of_tokens_with_different_precision() {
         token_code_id,
         generator_address: Some(String::from("generator")),
         owner: String::from("owner0000"),
+        asset_holder_rewards_code_id: 234u64,
     };
 
     let factory_instance = app
@@ -389,7 +396,13 @@ fn test_compatibility_of_tokens_with_different_precision() {
                 contract_addr: token_y_instance.clone(),
             },
         ],
-        init_params: Some(to_binary(&StablePoolParams { amp: 100 }).unwrap()),
+        init_params: Some(
+            to_binary(&StablePoolParams {
+                amp: 100,
+                asset_holder_rewards: None,
+            })
+            .unwrap(),
+        ),
     };
 
     app.execute_contract(owner.clone(), factory_instance.clone(), &msg, &[])
@@ -610,6 +623,7 @@ fn update_pair_config() {
         token_code_id: token_contract_code_id,
         generator_address: Some(String::from("generator")),
         owner: owner.to_string(),
+        asset_holder_rewards_code_id: 234u64,
     };
 
     let factory_instance = router
@@ -634,7 +648,13 @@ fn update_pair_config() {
         ],
         token_code_id: token_contract_code_id,
         factory_addr: factory_instance,
-        init_params: Some(to_binary(&StablePoolParams { amp: 100 }).unwrap()),
+        init_params: Some(
+            to_binary(&StablePoolParams {
+                amp: 100,
+                asset_holder_rewards: None,
+            })
+            .unwrap(),
+        ),
     };
 
     let pair = router
